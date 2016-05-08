@@ -3,7 +3,7 @@ Created on 1.5.2016
 
 @author: Jesse
 '''
-from blend_classifier_v2 import StackingClassifier
+from stacking_classifier import StackingClassifier
 from wrapper_classifier import WrapperClassifier as WC
 from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier, AdaBoostClassifier, RandomForestRegressor
 from sklearn.linear_model import LogisticRegression, LinearRegression
