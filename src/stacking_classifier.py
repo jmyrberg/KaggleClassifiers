@@ -1,14 +1,11 @@
 """
-
-Copyright 2016, Jesse Myrberg.
-BSD license, 3 clauses.
-
+Copyright 2016, 
+Jesse Myrberg (jesse.myrberg@aalto.fi)
 """
 
-import pandas as pd
 import numpy as np
 from sklearn.base import BaseEstimator, ClassifierMixin
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.cross_validation import StratifiedKFold, KFold
 from sklearn.metrics import accuracy_score
@@ -34,12 +31,12 @@ class StackingClassifier(BaseEstimator, ClassifierMixin):
         classifiers 'clfs' are trained over all but one fold at a time on the original 
         training set, where the non-trained fold is always left out for out-of-fold 
         probability predictions. Each time the level0 classifiers are trained, also 
-        predictions for test set are made. 
+        predictions for stacking_test set are made. 
         
         2. Test set predictions are combined as determined by the 'combine_folds_method'. 
         
         3. After this, the full original training set and test set can be represented 
-        with out-of-fold predictions. Both training and test set probabilities for each 
+        with out-of-fold predictions. Both training and stacking_test set probabilities for each 
         classifier are combined as determined by the 'combine_probas_method'. Original
         features can be stacked for both sets, as controlled by 'stack_original_features'.
         
@@ -51,10 +48,10 @@ class StackingClassifier(BaseEstimator, ClassifierMixin):
         5. Depending on the used prediction method (predict() or predict_proba()), the 
         output is either class labels or class probabilities for the original test set.
     
-        @NOTE: Currently, no error handling is done.
+        @NOTE: No error handling in this class!
     """
     
-    def __init__(self, clfs=[RandomForestClassifier()], meta_clfs=[LogisticRegression()], 
+    def __init__(self, clfs=[RandomForestClassifier(), ExtraTreesClassifier()], meta_clfs=[LogisticRegression()], 
                  n_blend_folds=5, stratified=True, stack_original_features=False,
                  combine_folds_method='fold_score', combine_probas_method='blended', 
                  combine_meta_probas_method='mean', weights = {}, save_blend_sets = None, 
@@ -69,8 +66,10 @@ class StackingClassifier(BaseEstimator, ClassifierMixin):
         
         Parameters
         ----------
-        clfs :  list (default=[RandomForestClassifier()])
-                Level0 classifiers with method .predict_proba().
+        clfs :  list (default=[RandomForestClassifier(), ExtraTreesClassifier()])
+                Level0 classifiers to use. Classifiers with no .predict_proba() method
+                are used with .predict() method, the result is rounded into nearest class, 
+                and the probability for that class is set to 1.
         
         meta_clfs : list (default=[LogisticRegression()])
                 Meta-level classifiers with either method .predict() or .predict_proba().
@@ -82,28 +81,41 @@ class StackingClassifier(BaseEstimator, ClassifierMixin):
                 Whether to use stratified folds or not.
         
         stack_original_features : boolean (default=False)
-                Whether to blend original features with probabilities or not.
+                Whether to stack original features with level0 probabilities or not.
         
         combine_folds_method : string (default='fold_score')
                 Method for combining out-of-fold predictions:
-                - 'mean' : take the mean of folds, individually for each predicted class
-                - 'median' : take the median of folds, individually for each predicted class
+                - 'mean' : take the mean over folds, separately for each predicted class
+                - 'median' : take the median over folds, separately for each predicted 
+                  class
                 - 'fold_score' : use fold weights from out-of-fold score (based on scoring 
                   function in 'scoring')
         
         combine_probas_method : string (default='blended')
                 Method for combining level0 probability predictions:
-                - 'blended' : blend all probabilities for all classes in columns
-                - 'mean' : take the mean over all classifiers, individually for each predicted class
-                - 'weighted' : use custom weights determined in 'weights' for each classifier
-                - 'fold_avg_score' : use average fold scores of classifiers as weights 
+                - 'stacked' : stack all probabilities for all classes and classifiers in columns
+                - 'mean' : take the mean over all classifiers, separately for each predicted class
+                - 'median' : take the median over all classifiers, separately for each predicted class
+                - 'weighted' : use custom weight for each classifier as determined in 'weights' 
+                - 'fold_avg_score' : use average fold scores as weights for each classifier
                   (based on scoring function in 'scoring')
+                - 'fold_geomavg_score' : use geometric average fold scores as weights for each 
+                  classifier (based on scoring function in 'scoring')
+                - 'fold_avg_pow_X_score' : use average fold score to the power of X for each
+                  classifier, such as w1^X + w2^X + ...
         
         combine_meta_probas_method : string (default='mean')
                 Method for combining predicted meta-classifier probabilities (.predict_proba() -method):
-                - 'mean' : take the mean over all meta-classifiers, individually for each predicted class
-                - 'median' : take the mean over all meta-classifiers, individually for each predicted class
-                - 'weighted' : use custom weights determined in 'weights' for each classifier
+                - 'mean' : take the mean over all meta-classifiers, separately for each predicted class
+                - 'median' : take the mean over all meta-classifiers, separately for each predicted class
+                - 'min' : take the minimum over all meta-classifiers, separately for each predicted class
+                - 'max' : take the maximum over all meta-classifiers, separately for each predicted class
+                - 'weighted' : use custom weight for each classifier as determined in 'weights'
+                - 'class_majority' : turn max probability into class and use majority vote
+                - 'class_mean_round' : turn max probability into class and use rounded mean as class
+                - 'class_median_round' : turn max probability into class and use rounded median as class
+                - 'class_min' : turn max probability into class and use minimum of classes as class
+                - 'class_max' : turn max probability into class and use maximum of classes as class
         
         weights : dict (default={})
                 - If 'weighted' method is used in 'combine_probas_method', then dict should have key
@@ -115,30 +127,39 @@ class StackingClassifier(BaseEstimator, ClassifierMixin):
                   
         save_blend_sets : None or string (default=None)
                 - If None, results are not saved on disk.
-                - If string, level0 class out-of-fold probability predictions for train set are saved in
-                  "string + _blend_train.npy", test set predictions are saved in "string + _blend_test.npy",
-                  and meta-classifier predictions (class or probability) are saved in "string + _blend_pred.npy"
+                - If string, level0 class out-of-fold probability predictions are saved as follows:
+                    o train set is saved in "string + _blend_train.npy"
+                    o stacking_test set predictions are saved in "string + _blend_test.npy"
+                    o meta-classifier probability predictions are saved in "string + _blend_pred_raw.npy"
+                    o meta-classifier output (StackingClassifier output), either class or probability 
+                      is saved in "string + blend_pred.npy"
         
         verbose : 0, 1, or 2 (default=0)
                 Print the training/prediction progress. The higher this is, the more is printed.
                 
         compute_scores : boolean (default=False)
                 Whether to compute out-of-fold scores with function in 'scoring'. The scores can be found in
-                'StackedClassifier().scores_'. Other parameters, such as 'verbose', 'combine_folds_method', 
-                'combine_probas_method' may override this to be True.
+                'StackedClassifier().scores_' after fit. Other parameters, such as 'verbose', 
+                'combine_folds_method', 'combine_probas_method' may override this parameter to be True.
         
         scoring : function (default=sklearn.metrics.accuracy_score)
-                Function to use for out-of-fold scores if 'compute_scores'=True. May be custom function that
-                takes parameters (y_true, y_pred) as input, and returns a numeric score.
+                Function to maximize and use for out-of-fold scores if 'compute_scores'=True. If the
+                metric needs to be minimized, use a custom function that takes parameters (y_true, y_pred)
+                as input, and returns a numeric score. If the score needs to be minimized, one can use
+                for example a custom function with "return(1-original_function(y_pred,y_true)".
                 
         seed : int (default=1234)
                 Seed for k-fold iterations. Level 0 classifier and meta-classifier seeds should be set manually.
                 
                 
+        Parameters
+        ----------
+        
+                
                 
         Example
         ----------        
-        from blend_classifier import StackingClassifier
+        from stacking_classifier import StackingClassifier
         from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier, AdaBoostClassifier
         from sklearn.linear_model import LogisticRegression
         from sklearn.cross_validation import cross_val_score
@@ -147,32 +168,38 @@ class StackingClassifier(BaseEstimator, ClassifierMixin):
         import numpy as np
             
         # Load data
-        print('Loading data...')
+        print('\nLoading data...')
         x_train = pd.read_csv('./Data/train.csv').as_matrix()
-        y_train = pd.read_csv('./Data/y_train.csv').as_matrix()
-        x_test = pd.read_csv('./Data/test.csv').as_matrix()
+        x_test = x_train[:1000]
+        x_train = x_train[1000:]
+        y_train = x_train[:,11].astype(np.int32)
+        x_train = x_train[:,:11]
+        y_test = x_test[:,11].astype(np.int32)
+        x_test = x_test[:,:11]
+        y_train[y_train==1] = 2
+        print('Original data shapes:',x_train.shape,x_test.shape,y_train.shape,y_test.shape)
         
-        # Level 0 models
+        # Models
         print('\nGenerating models...')
         l0_1 = RandomForestClassifier(n_estimators=50, n_jobs=1, random_state=1234)
         l0_2 = ExtraTreesClassifier(n_estimators=50, n_jobs=1, random_state=1234)
+        l0_3 = AdaBoostClassifier(n_estimators=10, random_state=1234)
         l1_1 = LogisticRegression(C=1,random_state=1234)
-        l1_2 = LogisticRegression(C=0.5,random_state=1234)
-        l1_3 = LogisticRegression(C=0.25,random_state=1234)
+        l1_2 = LogisticRegression(C=0.8,random_state=1234)
+        l1_3 = LogisticRegression(C=1.2,random_state=1234)
         
         clf = StackingClassifier(
-                                clfs=[l0_1,l0_2], 
+                                clfs=[l0_1,l0_2,l0_3], 
                                 meta_clfs=[l1_1,l1_2,l1_3],
                                 n_blend_folds=5,
                                 stratified=True,
                                 stack_original_features=True,
                                 combine_folds_method='fold_score',
-                                combine_probas_method='weighted', 
-                                combine_meta_probas_method='mean', 
-                                combine_meta_class_method='median',
-                                weights={'combine_probas':[0.3,0.7]}, 
-                                save_preds='myStackRun',
-                                verbose=2,
+                                combine_probas_method='fold_avg_pow_50_score', 
+                                combine_meta_probas_method='weighted', 
+                                weights = {'combine_meta_probas':[0.5,0.3,0.2]}, 
+                                save_blend_sets='myStacker',
+                                verbose=0,
                                 compute_scores = True,
                                 scoring = accuracy_score,
                                 seed=1234
@@ -203,14 +230,16 @@ class StackingClassifier(BaseEstimator, ClassifierMixin):
         cv = cross_val_score(clf, x_train, y_train, cv=5, scoring='accuracy', n_jobs=4)
         print('Accuracy: %.6f' % round(np.mean(cv),6))
         
-        # Load saved predictions
+        # Open predictions
         print('\nLoading saved predictions...')
-        blend_train = np.load('myStackRun_blend_train.npy')
-        blend_test = np.load('myStackRun_blend_test.npy')
-        blend_pred = np.load('myStackRun_blend_pred.npy')
-        print(blend_train.shape,blend_test.shape,blend_pred.shape)
+        blend_train = np.load('myStacker_blend_train.npy')
+        blend_test = np.load('myStacker_blend_test.npy')
+        y_pred_raw = np.load('myStacker_blend_pred_raw.npy')
+        y_pred = np.load('myStacker_blend_pred.npy')
+        print(blend_train.shape,blend_test.shape,y_pred_raw.shape,y_pred.shape)
         
-        print('\nDone!')
+        
+        print('\nAll ok!')
         """
         self.clfs = clfs
         self.meta_clfs = meta_clfs
@@ -462,7 +491,7 @@ class StackingClassifier(BaseEstimator, ClassifierMixin):
         self._set_clf_names()
         self._copy_lvl0_clfs()
         self.must_compute_scores_ = self._must_compute_score()
-        self.classes_ = np.sort(pd.unique(y_train))
+        self.classes_ = np.sort(np.unique(y_train))
         self.n_classes_ = len(self.classes_)
         self.n_clfs_ = len(self.clfs)
         self.n_meta_clfs_ = len(self.meta_clfs)
