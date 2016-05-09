@@ -5,17 +5,6 @@ The basic idea behind stacked generalization is to use a pool of base classifier
 
 References: [Kaggle Ensembling Guide](http://mlwave.com/kaggle-ensembling-guide/), [Stacked Generalization](http://www.cs.utsa.edu/~bylander/cs6243/wolpert92stacked.pdf)
     
-###Example
-StackingClassifier works similar to other sklearn classifiers:
-```
-x_train, y_train, x_test = load_data()
-clf = StackingClassifier(clfs = [RandomForestClassifier(), ExtraTreesClassifier()], 
-                         meta_clfs=[LogisticRegression()])
-clf.fit(x_train,y_train)
-y_pred_proba = clf.predict_proba(x_test)
-y_pred_labels = clf.predict(x_test)
-```
-
 ###How StackingClassifier works:
 1. StackingClassifier takes level0 classifiers as an input. These level0 classifiers 'clfs' are trained over all but one fold at a time on the original training set, where the non-trained fold is always left out for out-of-fold probability predictions. Each time the level0 classifiers are trained, also predictions for the original test set are made. 
 
@@ -26,7 +15,30 @@ y_pred_labels = clf.predict(x_test)
 4. The new combined training and test sets are called blend_train and blend_test,and they are used for training and predicting class probabilities with meta-classifiers 'meta_clfs'. The method to combine predictions of multiple meta-classifiers is controlled by 'combine_meta_probas_method'.
 
 5. Depending on the used prediction method (predict() or predict_proba()), the output is either class labels or class probabilities for the original test set.
+    
+###[Simple example](../src/stacking_simple_example.py)
+StackingClassifier works similar to any other sklearn classifier:
+```
+# Load data
+x_train, y_train, x_test, y_true = load_data()
 
+# Create model
+clf = StackingClassifier(clfs = [RandomForestClassifier(), ExtraTreesClassifier()],
+                         meta_clfs = [LogisticRegression()])
+
+
+# Fit and predict
+clf.fit(x_train,y_train)
+y_pred = clf.predict(x_test)
+
+# Evaluate
+print('Accuracy: %f' % ((y_pred==y_true).sum() / y_pred.shape[0]))
+```
+
+###Methods
+* **fit(X,y)** : Fit model to training data X with training targets y.
+* **predict(X)** : Perform classification on samples in X.
+* **predict_proba(X)** : Predict class probabilities on samples in X.
 
 ###Parameters
 * **clfs** :  list (default=[RandomForestClassifier(), ExtraTreesClassifier()])
@@ -111,13 +123,11 @@ y_pred_labels = clf.predict(x_test)
 
   Seed for k-fold iterations. Level 0 classifier and meta-classifier seeds should be set manually.
                 
-                
 ###Attributes
 TODO
                 
                 
-###Full example
-####Imports
+###[Full example](../src/stacking_full_example.py)
 ```
 from stacking_classifier import StackingClassifier
 from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier, AdaBoostClassifier
@@ -126,90 +136,84 @@ from sklearn.cross_validation import cross_val_score
 from sklearn.metrics import accuracy_score
 import pandas as pd
 import numpy as np
-```
-  
-#####Load data
-```
-x_train = pd.read_csv('./Data/train.csv').as_matrix()
-x_test = x_train[:1000]
-x_train = x_train[1000:]
-y_train = x_train[:,11].astype(np.int32)
-x_train = x_train[:,:11]
-y_test = x_test[:,11].astype(np.int32)
-x_test = x_test[:,:11]
-y_train[y_train==1] = 2
-print('Original data shapes:',x_train.shape,x_test.shape,y_train.shape,y_test.shape)
-```
 
-#####Level 0 classifiers
-```
-l0_1 = RandomForestClassifier(n_estimators=50, n_jobs=1, random_state=1234)
-l0_2 = ExtraTreesClassifier(n_estimators=50, n_jobs=1, random_state=1234)
-l0_3 = AdaBoostClassifier(n_estimators=10, random_state=1234)
-```
+def load_data():
+    data = pd.read_csv('./Data/winequality-white.csv', sep=';').as_matrix()
+    data[data[:,11]==9] = 8
+    x_train, y_train = data[:3000,:11], data[:3000,11]
+    x_test, y_true = data[3000:,:11], data[3000:,11]
+    return(x_train, y_train, x_test, y_true)
 
-#####Meta-classifiers
-```
-l1_1 = LogisticRegression(C=1,random_state=1234)
-l1_2 = LogisticRegression(C=0.8,random_state=1234)
-l1_3 = LogisticRegression(C=1.2,random_state=1234)
-```
+def main():
+    
+    # Load data
+    print('\nLoading data...')
+    x_train, y_train, x_test, y_true = load_data()
+    print('Original data shapes:',x_train.shape,x_test.shape,y_train.shape,y_true.shape)
+    
+    # Create models
+    print('\nCreating models...')
+    l0_1 = RandomForestClassifier(n_estimators=50, n_jobs=1, random_state=1234)
+    l0_2 = ExtraTreesClassifier(n_estimators=50, n_jobs=1, random_state=1234)
+    l0_3 = AdaBoostClassifier(n_estimators=20, random_state=1234)
+    l1_1 = LogisticRegression(C=1,random_state=1234)
+    l1_2 = LogisticRegression(C=0.8,random_state=1234)
+    l1_3 = LogisticRegression(C=1.2,random_state=1234)
+    
+    clf = StackingClassifier(
+                            clfs=[l0_1,l0_2,l0_3], 
+                            meta_clfs=[l1_1,l1_2,l1_3],
+                            n_blend_folds=5,
+                            stratified=True,
+                            stack_original_features=True,
+                            combine_folds_method='fold_score',
+                            combine_probas_method='fold_avg_pow_50_score', 
+                            combine_meta_probas_method='weighted', 
+                            weights = {'combine_meta_probas':[0.5,0.3,0.2]}, 
+                            save_blend_sets='myStacker',
+                            verbose=0,
+                            compute_scores = True,
+                            scoring = accuracy_score,
+                            seed=1234
+                            )
+    
+    # Class prediction
+    print('\nClass prediction...')
+    clf2 = clf
+    clf2.fit(x_train,y_train)
+    y_pred = clf2.predict(x_test)
+    print('Scores: %s' % clf2.scores_)
+    print('Classes: %s' % clf2.classes_)
+    print('Prediction shape:', y_pred.shape)
+    print('Accuracy: %.6f' % round(accuracy_score(y_true, y_pred),6))
+    
+    # Probability prediction
+    print('\nProbability prediction...')
+    clf3 = clf
+    clf3.fit(x_train,y_train)
+    y_pred_proba = clf3.predict_proba(x_test)
+    print('Scores: %s' % clf3.scores_)
+    print('Classes: %s' % clf2.classes_)
+    print('Prediction shape:',y_pred_proba.shape)
+    print('Accuracy: %.6f' % round(accuracy_score(y_true,
+                              clf3.classes_[np.argmax(y_pred_proba, axis=1)]),6))
+    
+    # Cross validation
+    print('\nCross validating...')
+    cv = cross_val_score(clf, x_train, y_train, cv=5, scoring='accuracy', n_jobs=4)
+    print('Accuracy: %.6f' % round(np.mean(cv),6))
+    
+    # Load saved predictions
+    print('\nLoading saved predictions...')
+    blend_train = np.load('myStacker_blend_train.npy')
+    blend_test = np.load('myStacker_blend_test.npy')
+    y_pred_raw = np.load('myStacker_blend_pred_raw.npy')
+    y_pred = np.load('myStacker_blend_pred.npy')
+    print(blend_train.shape,blend_test.shape,y_pred_raw.shape,y_pred.shape)
+    
+    print('\nDone!')
+    
 
-#####Create new StackingClassfier
-```
-clf = StackingClassifier(
-                      clfs=[l0_1,l0_2,l0_3], 
-                      meta_clfs=[l1_1,l1_2,l1_3],
-                      n_blend_folds=5,
-                      stratified=True,
-                      stack_original_features=True,
-                      combine_folds_method='fold_score',
-                      combine_probas_method='fold_avg_pow_50_score', 
-                      combine_meta_probas_method='weighted', 
-                      weights = {'combine_meta_probas':[0.5,0.3,0.2]}, 
-                      save_blend_sets='myStacker',
-                      verbose=0,
-                      compute_scores = True,
-                      scoring = accuracy_score,
-                      seed=1234
-                      )
-```
-
-#####Class prediction
-```
-clf2 = clf
-clf2.fit(x_train,y_train)
-y_pred = clf2.predict(x_test)
-print('Scores: %s' % clf2.scores_)
-print('Classes: %s' % clf2.classes_)
-print('Prediction shape:', y_pred.shape)
-print('Accuracy: %.6f' % round(accuracy_score(y_test, y_pred),6))
-```
-
-#####Probability prediction
-```
-print('\nProbability prediction...')
-clf3 = clf
-clf3.fit(x_train,y_train)
-y_pred_proba = clf3.predict_proba(x_test)
-print('Scores: %s' % clf3.scores_)
-print('Classes: %s' % clf2.classes_)
-print('Prediction shape:',y_pred_proba.shape)
-print('Accuracy: %.6f' % round(accuracy_score(y_test, clf3.classes_[np.argmax(y_pred_proba, axis=1)]),6))
-```
-
-#####Cross validation using sklearn
-```
-cv = cross_val_score(clf, x_train, y_train, cv=5, scoring='accuracy', n_jobs=4)
-print('Accuracy: %.6f' % round(np.mean(cv),6))
-```
-
-#####Open saved sets
-```
-print('\nLoading saved predictions...')
-blend_train = np.load('myStacker_blend_train.npy')
-blend_test = np.load('myStacker_blend_test.npy')
-y_pred_raw = np.load('myStacker_blend_pred_raw.npy')
-y_pred = np.load('myStacker_blend_pred.npy')
-print(blend_train.shape,blend_test.shape,y_pred_raw.shape,y_pred.shape)
+if __name__ == '__main__':
+    main()
 ```
