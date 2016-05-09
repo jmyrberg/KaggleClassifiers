@@ -26,7 +26,6 @@ x_train, y_train, x_test, y_true = load_data()
 clf = StackingClassifier(clfs = [RandomForestClassifier(), ExtraTreesClassifier()],
                          meta_clfs = [LogisticRegression()])
 
-
 # Fit and predict
 clf.fit(x_train,y_train)
 y_pred = clf.predict(x_test)
