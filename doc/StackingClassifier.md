@@ -11,7 +11,7 @@ References:
     
     
 ###How StackingClassifier works:
-1. StackingClassifier takes level0 classifiers as an input. These level0 classifiers 'clfs' are trained over all but one fold at a time on the original training set, where the non-trained fold is always left out for out-of-fold probability predictions. Each time the level0 classifiers are trained, also predictions for stacking_test set are made. 
+1. StackingClassifier takes level0 classifiers as an input. These level0 classifiers 'clfs' are trained over all but one fold at a time on the original training set, where the non-trained fold is always left out for out-of-fold probability predictions. Each time the level0 classifiers are trained, also predictions for the original test set are made. 
 
 2. Test set predictions are combined as determined by the 'combine_folds_method'. 
 
