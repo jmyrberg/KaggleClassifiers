@@ -1,4 +1,6 @@
 """
+StackingClassifier
+
 Copyright 2016, 
 Jesse Myrberg (jesse.myrberg@aalto.fi)
 """
@@ -19,10 +21,10 @@ class StackingClassifier(BaseEstimator, ClassifierMixin):
     """
     
     def __init__(self, clfs=[RandomForestClassifier(), ExtraTreesClassifier()], meta_clfs=[LogisticRegression()], 
-                 n_blend_folds=5, stratified=True, stack_original_features=False,
-                 combine_folds_method='fold_score', combine_probas_method='blended', 
+                 n_blend_folds=3, stratified=True, stack_original_features=False,
+                 combine_folds_method='fold_score', combine_probas_method='stacked', 
                  combine_meta_probas_method='mean', weights = {}, save_blend_sets = None, 
-                 verbose=0, compute_scores = False, scoring = accuracy_score, seed=1234):
+                 verbose=0, compute_scores = False, scoring = accuracy_score, seed=None):
         """
         Stacked generalization
         ----------------------
@@ -96,7 +98,7 @@ class StackingClassifier(BaseEstimator, ClassifierMixin):
                 - If None, results are not saved on disk.
                 - If string, level0 class out-of-fold probability predictions are saved as follows:
                     o train set is saved in "string + _blend_train.npy"
-                    o stacking_test set predictions are saved in "string + _blend_test.npy"
+                    o stacking_full_example set predictions are saved in "string + _blend_test.npy"
                     o meta-classifier probability predictions are saved in "string + _blend_pred_raw.npy"
                     o meta-classifier output (StackingClassifier output), either class or probability 
                       is saved in "string + blend_pred.npy"
