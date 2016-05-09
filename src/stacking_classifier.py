@@ -16,39 +16,6 @@ from copy import copy
 class StackingClassifier(BaseEstimator, ClassifierMixin):
     """ 
     Base class for stacked generalization classifier.
-    
-    Stacked generalization
-    ----------------------
-    The basic idea behind stacked generalization is to use a pool of base classifiers 
-    (level 0 classifiers), and then combine their predictions by using another set of 
-    classifiers, meta-classifiers, with the aim of reducing the generalization error.
-    
-    
-    How StackingClassifier works:
-    -----------------------------
-    
-        1. StackingClassifier only takes level0 classifiers as an input. These level0 
-        classifiers 'clfs' are trained over all but one fold at a time on the original 
-        training set, where the non-trained fold is always left out for out-of-fold 
-        probability predictions. Each time the level0 classifiers are trained, also 
-        predictions for stacking_test set are made. 
-        
-        2. Test set predictions are combined as determined by the 'combine_folds_method'. 
-        
-        3. After this, the full original training set and test set can be represented 
-        with out-of-fold predictions. Both training and stacking_test set probabilities for each 
-        classifier are combined as determined by the 'combine_probas_method'. Original
-        features can be stacked for both sets, as controlled by 'stack_original_features'.
-        
-        4. The new combined training and test sets are called blend_train and blend_test,
-        and they are used for training and predicting class probabilities with 
-        meta-classifiers 'meta_clfs'. The method to combine predictions of multiple 
-        meta-classifiers is controlled by 'combine_meta_probas_method'.
-        
-        5. Depending on the used prediction method (predict() or predict_proba()), the 
-        output is either class labels or class probabilities for the original test set.
-    
-        @NOTE: No error handling in this class!
     """
     
     def __init__(self, clfs=[RandomForestClassifier(), ExtraTreesClassifier()], meta_clfs=[LogisticRegression()], 
@@ -152,7 +119,7 @@ class StackingClassifier(BaseEstimator, ClassifierMixin):
                 Seed for k-fold iterations. Level 0 classifier and meta-classifier seeds should be set manually.
                 
                 
-        Parameters
+        Attributes
         ----------
         
                 
