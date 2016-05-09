@@ -3,13 +3,19 @@
 ###Stacked generalization
 The basic idea behind stacked generalization is to use a pool of base classifiers (level 0 classifiers), and then combine their predictions by using another set of classifiers, meta-classifiers, with the aim of reducing the generalization error.
 
-References: 
-
-- [Kaggle Ensembling Guide](http://mlwave.com/kaggle-ensembling-guide/)
-
-- [Stacked Generalization](http://www.cs.utsa.edu/~bylander/cs6243/wolpert92stacked.pdf)
+References: [Kaggle Ensembling Guide](http://mlwave.com/kaggle-ensembling-guide/), [Stacked Generalization](http://www.cs.utsa.edu/~bylander/cs6243/wolpert92stacked.pdf)
     
-    
+###Example
+StackingClassifier works similar to other sklearn classifiers:
+```
+x_train, y_train, x_test = load_data()
+clf = StackingClassifier(clfs = [RandomForestClassifier(), ExtraTreesClassifier()], 
+                         meta_clfs=[LogisticRegression()])
+clf.fit(x_train,y_train)
+y_pred_proba = clf.predict_proba(x_test)
+y_pred_labels = clf.predict(x_test)
+```
+
 ###How StackingClassifier works:
 1. StackingClassifier takes level0 classifiers as an input. These level0 classifiers 'clfs' are trained over all but one fold at a time on the original training set, where the non-trained fold is always left out for out-of-fold probability predictions. Each time the level0 classifiers are trained, also predictions for the original test set are made. 
 
@@ -110,7 +116,7 @@ References:
 TODO
                 
                 
-###Example
+###Full example
 ####Imports
 ```
 from stacking_classifier import StackingClassifier
