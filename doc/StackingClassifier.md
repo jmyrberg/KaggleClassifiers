@@ -1,10 +1,13 @@
-# KaggleClassifiers
-## StackingClassifier
+# StackingClassifier
 
 ###Stacked generalization
 The basic idea behind stacked generalization is to use a pool of base classifiers (level 0 classifiers), and then combine their predictions by using another set of classifiers, meta-classifiers, with the aim of reducing the generalization error.
 
-See: [Kaggle Ensembling Guide](http://mlwave.com/kaggle-ensembling-guide/)
+References: 
+
+- [Kaggle Ensembling Guide](http://mlwave.com/kaggle-ensembling-guide/)
+
+- [Stacked Generalization](http://www.cs.utsa.edu/~bylander/cs6243/wolpert92stacked.pdf)
     
     
 ###How StackingClassifier works:
