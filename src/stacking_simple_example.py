@@ -1,8 +1,9 @@
 """
 StackingClassifier: Simple example
 
-Copyright 2016, 
+Copyright 2016
 Jesse Myrberg (jesse.myrberg@aalto.fi)
+https://github.com/jmyrberg/KaggleClassifiers/
 """
 from stacking_classifier import StackingClassifier
 from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier

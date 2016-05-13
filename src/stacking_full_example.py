@@ -1,8 +1,9 @@
 """
 StackingClassifier: Full example
 
-Copyright 2016, 
+Copyright 2016
 Jesse Myrberg (jesse.myrberg@aalto.fi)
+https://github.com/jmyrberg/KaggleClassifiers/
 """
 from stacking_classifier import StackingClassifier
 from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier, AdaBoostClassifier
@@ -11,16 +12,18 @@ from sklearn.cross_validation import cross_val_score
 from sklearn.metrics import accuracy_score
 import pandas as pd
 import numpy as np
+from sklearn.ensemble.forest import RandomForestRegressor
 
 def load_data():
     data = pd.read_csv('./Data/winequality-white.csv', sep=';').as_matrix()
-    data[data[:,11]==9] = 8
+    data[data[:,11]==9,11] = 6
+    data[data[:,11]!=6,11] = 7
     x_train, y_train = data[:3000,:11], data[:3000,11]
     x_test, y_true = data[3000:,:11], data[3000:,11]
     return(x_train, y_train, x_test, y_true)
 
 def main():
-    
+
     # Load data
     print('\nLoading data...')
     x_train, y_train, x_test, y_true = load_data()
@@ -28,7 +31,7 @@ def main():
     
     # Create models
     print('\nCreating models...')
-    l0_1 = RandomForestClassifier(n_estimators=50, n_jobs=1, random_state=1234)
+    l0_1 = RandomForestRegressor(n_estimators=50, n_jobs=1, random_state=1234)
     l0_2 = ExtraTreesClassifier(n_estimators=50, n_jobs=1, random_state=1234)
     l0_3 = AdaBoostClassifier(n_estimators=20, random_state=1234)
     l1_1 = LogisticRegression(C=1,random_state=1234)
@@ -40,11 +43,11 @@ def main():
                             meta_clfs=[l1_1,l1_2,l1_3],
                             n_blend_folds=5,
                             stratified=True,
-                            stack_original_features=True,
-                            combine_folds_method='fold_score',
-                            combine_probas_method='fold_avg_pow_50_score', 
+                            stack_original_features=False,
+                            combine_fold_probas_method='fold_score',
+                            combine_lvl0_probas_method='fold_avg_pow_50_score', 
                             combine_meta_probas_method='weighted', 
-                            weights = {'combine_meta_probas':[0.5,0.3,0.2]}, 
+                            weights = {'combine_meta_probas':[0.5,0.3,0.2]},
                             save_blend_sets='myStacker',
                             verbose=0,
                             compute_scores = True,
@@ -87,6 +90,7 @@ def main():
     print(blend_train.shape,blend_test.shape,y_pred_raw.shape,y_pred.shape)
     
     print('\nDone!')
+    print(clf.kf_)
     
 
 if __name__ == '__main__':
