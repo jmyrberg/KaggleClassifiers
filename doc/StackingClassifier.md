@@ -34,11 +34,6 @@ y_pred = clf.predict(x_test)
 print('Accuracy: %f' % ((y_pred==y_true).sum() / y_pred.shape[0]))
 ```
 
-###Methods
-* **fit(X,y)** : Fit model to training data X with training targets y.
-* **predict(X)** : Perform classification on samples in X.
-* **predict_proba(X)** : Predict class probabilities on samples in X.
-
 ###Parameters
 * **clfs** :  list (default=[RandomForestClassifier(), ExtraTreesClassifier()])
 
@@ -134,7 +129,12 @@ print('Accuracy: %f' % ((y_pred==y_true).sum() / y_pred.shape[0]))
 * **seed** : int (default=None)
 
   Seed for k-fold iterations. Level 0 classifier and meta-classifier seeds should be set manually.
-                
+  
+###Methods
+* **fit(X,y)** : Fit model to training data X with training targets y.
+* **predict(X)** : Perform classification on samples in X.
+* **predict_proba(X)** : Predict class probabilities on samples in X. 
+ 
 ###Attributes
 
 The following attributes are available after fitting:
